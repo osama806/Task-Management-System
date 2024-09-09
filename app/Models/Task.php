@@ -21,9 +21,10 @@ class Task extends Model
         'description',
         'priority',
         'assign_to',
-        'status',
         'due_date'
     ];
+
+    public $guarded = ['status'];
 
     protected $dates = ['due_date', 'deleted_at'];
 
