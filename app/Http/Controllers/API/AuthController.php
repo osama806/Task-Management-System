@@ -76,6 +76,20 @@ class AuthController extends Controller
             : $this->getResponse("msg", $response['msg'], $response['code']);
     }
 
+
+    /**
+     * Refresh token method
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     */
+    public function refresh()
+    {
+        $response = $this->authService->refreshToken();
+
+        return $response['status']
+            ? $this->getResponse('token', $response['token'], 200)
+            : $this->getResponse('error', $response['msg'], $response['code']);
+    }
+
     /**
      * To make logout for user if be authorize
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response

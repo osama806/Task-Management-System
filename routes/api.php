@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::prefix('auth')->controller(AuthController::class)->group(function () {
         Route::middleware('auth:api')->group(function () {
+            Route::post('refresh', 'refresh');
             Route::get('user/profile', 'show');
             Route::put('users/{id}', 'updateProfile');
             Route::post('logout', 'logout');

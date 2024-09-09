@@ -7,6 +7,8 @@ use App\Traits\ResponseTrait;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use Tymon\JWTAuth\Exceptions\TokenInvalidException;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthService
@@ -98,6 +100,34 @@ class AuthService
             return ['status'    =>  false, 'msg'    =>  "username or password is incorrect", 'code' =>  401];
         }
         return ["status"    =>  true, "token"   =>      $token];
+    }
+
+    /**
+     * Refresh token method
+     * @return array
+     */
+    public function refreshToken()
+    {
+        try {
+            $newToken = JWTAuth::parseToken()->refresh();
+
+            return [
+                'status' => true,
+                'token'  => $newToken,
+            ];
+        } catch (TokenInvalidException $e) {
+            return [
+                'status' => false,
+                'msg'    => 'Token is invalid',
+                'code'   => 401
+            ];
+        } catch (JWTException $e) {
+            return [
+                'status' => false,
+                'msg'    => 'A token is required',
+                'code'   => 400
+            ];
+        }
     }
 
     /**
