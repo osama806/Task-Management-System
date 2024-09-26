@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginFormRequest;
-use App\Http\Requests\Auth\RegisterFormRequest;
-use App\Http\Requests\Auth\RetriveFormRequest;
-use App\Http\Requests\Auth\UpdateProfileFormRequest;
+use App\Http\Requests\Auth\DeleteUserRequest;
+use App\Http\Requests\Auth\LoginUserRequest;
+use App\Http\Requests\Auth\RegisterUserRequest;
+use App\Http\Requests\Auth\RetriveUserRequest;
+use App\Http\Requests\Auth\UpdateProfileUserRequest;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\AuthService;
 use App\Traits\ResponseTrait;
+use Illuminate\Support\Facades\Auth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -41,10 +44,10 @@ class AuthController extends Controller
 
     /**
      * Create a new user in storage.
-     * @param \App\Http\Requests\Auth\RegisterFormRequest $registerFormRequest
+     * @param \App\Http\Requests\Auth\RegisterUserRequest $registerFormRequest
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function register(RegisterFormRequest $registerFormRequest)
+    public function register(RegisterUserRequest $registerFormRequest)
     {
         $validatedData = $registerFormRequest->validated();
         $response = $this->authService->register($validatedData);
@@ -64,30 +67,16 @@ class AuthController extends Controller
 
     /**
      * Check if user authorize or unAuthorize
-     * @param \App\Http\Requests\Auth\LoginFormRequest $loginFormRequest
+     * @param \App\Http\Requests\Auth\LoginUserRequest $loginFormRequest
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function login(LoginFormRequest $loginFormRequest)
+    public function login(LoginUserRequest $loginFormRequest)
     {
         $validatedData = $loginFormRequest->validated();
         $response = $this->authService->login($validatedData);
         return $response['status']
             ? $this->getResponse("token", $response['token'], 201)
             : $this->getResponse("msg", $response['msg'], $response['code']);
-    }
-
-
-    /**
-     * Refresh token method
-     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
-     */
-    public function refresh()
-    {
-        $response = $this->authService->refreshToken();
-
-        return $response['status']
-            ? $this->getResponse('token', $response['token'], 200)
-            : $this->getResponse('error', $response['msg'], $response['code']);
     }
 
     /**
@@ -120,16 +109,12 @@ class AuthController extends Controller
 
     /**
      * Update user profile in storage
-     * @param \App\Http\Requests\Auth\UpdateProfileFormRequest $updateProfileFormRequest
-     * @param mixed $id
+     * @param \App\Http\Requests\Auth\UpdateProfileUserRequest $updateProfileFormRequest
+     * @param \App\Models\User $user
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function updateProfile(UpdateProfileFormRequest $updateProfileFormRequest, $id)
+    public function updateProfile(UpdateProfileUserRequest $updateProfileFormRequest, User $user)
     {
-        $user = User::find($id);
-        if (!$user) {
-            return $this->getResponse('error', 'Not Found This User', 404);
-        }
         $validatedData = $updateProfileFormRequest->validated();
         $response = $this->authService->updateProfile($validatedData, $user);
         return $response['status']
@@ -138,7 +123,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Delete user from storage.
+     * Delete auth user from storage.
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
     public function deleteUser()
@@ -150,16 +135,48 @@ class AuthController extends Controller
     }
 
     /**
+     * Get list of users that soft deleted
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     */
+    public function showDeletedUsers()
+    {
+        if (Auth::user()->role === null) {
+            return $this->getResponse('error', "You can't access to this permission", 400);
+        }
+        $users = User::onlyTrashed()->get();
+        return $this->getResponse('deleted-users', UserResource::collection($users), 200);
+    }
+
+    /**
      * Retrive user after deleted
      * @param mixed $email
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function restoreUser(RetriveFormRequest $retriveFormRequest)
+    public function restoreUser(RetriveUserRequest $retriveFormRequest)
     {
         $validated = $retriveFormRequest->validated();
         $response = $this->authService->restoreUser($validated);
         return $response['status']
             ? $this->getResponse('msg', 'User restored successfully', 200)
             : $this->getResponse('msg', $response['msg'], $response['code']);
+    }
+
+    /**
+     * Force delete user from storage.
+     * @param \App\Http\Requests\Auth\DeleteUserRequest $deleteUserRequest
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     */
+    public function forceDeleteUser(DeleteUserRequest $deleteUserRequest)
+    {
+        $validatedData = $deleteUserRequest->validated();
+        $user = User::where('email', $validatedData['email'])->first();
+        if (!$user) {
+            $user = User::onlyTrashed()->where('email', $validatedData['email'])->first();
+            if (!$user) {
+                return $this->getResponse('error', 'User Not Found', 404);
+            }
+        }
+        $user->forceDelete();
+        return $this->getResponse('msg', 'Deleted user permanently', 200);
     }
 }

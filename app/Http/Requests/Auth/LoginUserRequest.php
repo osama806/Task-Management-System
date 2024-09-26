@@ -3,30 +3,20 @@
 namespace App\Http\Requests\Auth;
 
 use App\Traits\ResponseTrait;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
-class RetriveFormRequest extends FormRequest
+class LoginUserRequest extends FormRequest
 {
     use ResponseTrait;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return Auth::check() && Auth::user()->role == "admin";
-    }
-
-    /**
-     * Handle failed authorization.
-     * @throws \Illuminate\Http\Exceptions\HttpResponseException
-     * @return never
-     */
-    public function failedAuthorization()
-    {
-        throw new HttpResponseException($this->getResponse('error', 'This action is unauthorized.', 401));
+        return true;
     }
 
     /**
@@ -37,19 +27,20 @@ class RetriveFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email'     =>  'required|email'
+            "email"         =>      "required|string|email",
+            "password"      =>      "required|string|min:8|max:15"
         ];
     }
 
     /**
-     * Handle failed validation.
+     * Get message that errors explanation
      * @param \Illuminate\Contracts\Validation\Validator $validator
      * @throws \Illuminate\Validation\ValidationException
      * @return never
      */
-    public function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
+    public function failedValidation(Validator $validator)
     {
-        throw new ValidationException($validator, $this->getResponse('errors', $validator->errors(), 422));
+        throw new HttpResponseException( $this->getResponse("errors", $validator->errors(), 422));
     }
 
     /**
@@ -59,7 +50,8 @@ class RetriveFormRequest extends FormRequest
     public function attributes()
     {
         return [
-            'email'    => 'Email Address',
+            "email"     =>      "Email address",
+            "password"  =>      "Password"
         ];
     }
 
@@ -70,8 +62,10 @@ class RetriveFormRequest extends FormRequest
     public function messages()
     {
         return [
-            'required'      => 'The :attribute is required.',
-            'email'         => 'Please provide a valid :attribute.',
+            "required"        =>      ":attribute is required",
+            "email"           =>      "Please enter a valid :attribute",
+            "min"             =>      ":attribute must be at least :min characters long",
+            "max"             =>      ":attribute must be at less than :max characters"
         ];
     }
 }

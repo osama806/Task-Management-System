@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Task\AssignFormRequest;
-use App\Http\Requests\Task\FilterFormRequest;
-use App\Http\Requests\Task\StoreFormRequest;
-use App\Http\Requests\Task\UpdateFormRequest;
+use App\Http\Requests\Task\AssignTaskRequest;
+use App\Http\Requests\Task\FilterTaskRequest;
+use App\Http\Requests\Task\StoreTaskRequest;
+use App\Http\Requests\Task\UpdateTaskRequest;
+use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Services\TaskService;
 use App\Traits\ResponseTrait;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class TaskController extends Controller
 {
@@ -25,7 +29,7 @@ class TaskController extends Controller
      * Display a listing of the tasks.
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function index(FilterFormRequest $filterFormRequest)
+    public function index(FilterTaskRequest $filterFormRequest)
     {
         $validated = $filterFormRequest->validated();
         $response = $this->taskService->index($validated);
@@ -35,11 +39,21 @@ class TaskController extends Controller
     }
 
     /**
-     * Store a newly created task in storage.
-     * @param \App\Http\Requests\Task\StoreFormRequest $storeFormRequest
+     * Get list of tasks assigned to auth user
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function store(StoreFormRequest $storeFormRequest)
+    public function myTasks()
+    {
+        $tasks = Task::where('assign_to', Auth::id())->get();
+        return $this->getResponse('tasks', TaskResource::collection($tasks), 200);
+    }
+
+    /**
+     * Store a newly created task in storage.
+     * @param \App\Http\Requests\Task\StoreTaskRequest $storeFormRequest
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     */
+    public function store(StoreTaskRequest $storeFormRequest)
     {
         $validated = $storeFormRequest->validated();
         $response = $this->taskService->createTask($validated);
@@ -50,28 +64,26 @@ class TaskController extends Controller
 
     /**
      * Display the specified task.
-     * @param mixed $id
+     * @param \App\Models\Task $task
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
     public function show($id)
     {
-        $task = Task::find($id);
-        if (!$task) {
-            return $this->getResponse('error', 'Not Found This Task!', 404);
+        try {
+            $task = Task::findOrFail($id);
+            return $this->getResponse('task', new TaskResource($task), 200);
+        } catch (ModelNotFoundException $e) {
+            return $this->getResponse('error', 'Task not found', 404);
         }
-        $response = $this->taskService->show($task);
-        return $response['status']
-            ? $this->getResponse('task', $response['task'], 200)
-            : $this->getResponse('error', 'This error in server', 500);
     }
 
     /**
      * Update the specified task in storage.
-     * @param \App\Http\Requests\Task\UpdateFormRequest $updateFormRequest
+     * @param \App\Http\Requests\Task\UpdateTaskRequest $updateFormRequest
      * @param mixed $id
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function update(UpdateFormRequest $updateFormRequest, $id)
+    public function update(UpdateTaskRequest $updateFormRequest, $id)
     {
         $task = Task::find($id);
         if (!$task) {
@@ -102,6 +114,19 @@ class TaskController extends Controller
     }
 
     /**
+     * Get list of tasks that soft deleted
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     */
+    public function showDeletedTasks()
+    {
+        if (Auth::user()->role === null) {
+            return $this->getResponse('error', "You can't access to this permission", 400);
+        }
+        $tasks = Task::onlyTrashed()->get();
+        return $this->getResponse('deleted-tasks', TaskResource::collection($tasks), 200);
+    }
+
+    /**
      * Retrive the specified task after deleted.
      * @param mixed $id
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
@@ -119,12 +144,33 @@ class TaskController extends Controller
     }
 
     /**
-     * Assign task to specified user
-     * @param \App\Http\Requests\Task\AssignFormRequest $assignFormRequest
+     * Force delete Task from storage.
      * @param mixed $id
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function assign(AssignFormRequest $assignFormRequest, $id)
+    public function forceDeleteTask($id)
+    {
+        if (Auth::user()->role === null) {
+            return $this->getResponse('error', "You can't access to this permission", 400);
+        }
+        $task = Task::find($id);
+        if (!$task) {
+            $task = Task::withTrashed()->find($id);
+            if (!$task) {
+                return $this->getResponse('error', 'Task Not Found', 404);
+            }
+        }
+        $task->forceDelete();
+        return $this->getResponse('msg', 'Deleted task permanently', 200);
+    }
+
+    /**
+     * Assign task to specified user
+     * @param \App\Http\Requests\Task\AssignTaskRequest $assignFormRequest
+     * @param mixed $id
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     */
+    public function assign(AssignTaskRequest $assignFormRequest, $id)
     {
         $task = Task::find($id);
         if (!$task) {

@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\User;
 use App\Traits\ResponseTrait;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class TaskService
 {
@@ -14,43 +17,29 @@ class TaskService
 
     /**
      * Get list of tasks
+     * @param array $data
      * @return array
      */
     public function index(array $data)
     {
-        // Initialize the query builder for Task
-        $tasks = Task::query();
+        // Filter out null and empty string values
+        $filteredData = array_filter($data, function ($value) {
+            return !is_null($value) && trim($value) !== '';
+        });
 
-        // Apply filters if present
-        if (isset($data['priority'])) {
-            $tasks->priority($data['priority']);
-        }
-        if (isset($data['status'])) {
-            $tasks->status($data['status']);
-        }
+        // If no filters are provided, return all tasks
+        if (empty($filteredData)) {
+            $tasks = Task::all();
+        } else {
+            $tasksQuery = Task::query();
 
-        // Execute the query and get results
-        $tasks = $tasks->get();
-
-        // Check if any tasks were found
-        if ($tasks->isEmpty()) {
-            return ['status' => false, 'msg' => 'Not Found Any Task!', 'code' => 404];
+            // Apply filters using local scopes or conditions
+            $tasksQuery->priority($filteredData['priority'] ?? null);
+            $tasksQuery->status($filteredData['status'] ?? null);
+            $tasks = $tasksQuery->get();
         }
 
-        // Format the task data for the response
-        $taskData = [];
-        foreach ($tasks as $task) {
-            $taskData[] = [
-                'title'             => $task->title,
-                'description'       => $task->description,
-                'priority'          => $task->priority,
-                'assign_to'         => $task->assign_to,
-                'status'            => $task->status,
-                'due_date'          => $task->due_date,
-            ];
-        }
-
-        return ['status' => true, 'tasks' => $taskData];
+        return ['status' => true, 'tasks' => TaskResource::collection($tasks)];
     }
 
     /**
@@ -64,29 +53,12 @@ class TaskService
             'title'       => $data['title'],
             'description' => $data['description'],
             'priority'    => $data['priority'],
+            'created_by'  => Auth::user()->role
         ]);
 
         return $task
             ? ['status'    =>  true]
             : ['status'    =>  false, 'msg'    =>  'There is error in server', 'code'  =>  500];
-    }
-
-    /**
-     * Get spicified task
-     * @param \App\Models\Task $task
-     * @return array
-     */
-    public function show(Task $task)
-    {
-        $data = [
-            'title'       => $task->title,
-            'description' => $task->description,
-            'priority'    => $task->priority,
-            'assign_to'   => $task->assign_to,
-            'status'      => $task->status,
-            'due_date'    => $task->due_date
-        ];
-        return ['status'    =>  true, 'task'    =>  $data];
     }
 
     /**
@@ -97,23 +69,25 @@ class TaskService
      */
     public function update(array $data, Task $task)
     {
-        if ($task->status !== 'not-started') {
-            return ['status'    =>  false, 'msg'    =>  'This Task Is Completly Previous', 'code'   =>  400];
+        // manager can control in tasks that he created only
+        if (Auth::user()->role == 'manager' && $task->created_by !== 'manager') {
+            return [
+                'status'        =>      false,
+                'msg'           =>      'This task not create from you!',
+                'code'          =>      400
+            ];
         }
-        if (empty($data['title']) && empty($data['description']) && empty($data['priority'])) {
+        // return attributes value that not null and not empty
+        $filteredData = array_filter($data, function ($value) {
+            return !is_null($value) && trim($value) !== '';
+        });
+
+        if (count($filteredData) < 1) {
             return ['status' => false, 'msg' => 'Not Found Data in Request!', 'code' => 404];
         }
 
-        if (isset($data['title'])) {
-            $task->title = $data['title'];
-        }
-        if (isset($data['description'])) {
-            $task->description = $data['description'];
-        }
-        if (isset($data['priority'])) {
-            $task->priority = $data['priority'];
-        }
-        $task->save();
+        $task->update($filteredData);
+
         return ['status'    =>  true];
     }
 
@@ -138,9 +112,15 @@ class TaskService
      */
     public function restore(Task $task)
     {
-        if (!Auth::check() || Auth::user()->role !== "admin") {
-            return $this->getResponse('error', "Can't access delete permission", 400);
+        if (Auth::user()->role !== "admin") {
+            return [
+                'status'        =>      false,
+                'msg'           =>      "Can't access delete permission",
+                'code'          =>       400
+            ];
         }
+
+        // check if task deleted previous
         if ($task->deleted_at === null) {
             return [
                 'status' => false,
@@ -148,7 +128,54 @@ class TaskService
                 'code' => 400,
             ];
         }
+
+        // retrive task from delete
         $task->restore();
+
+        return ['status' => true];
+    }
+
+    /**
+     * Assigned a specified task to user
+     * @param array $data
+     * @param \App\Models\Task $task
+     * @return array
+     */
+    public function assign(array $data, Task $task)
+    {
+        // check if task assigned to user already previous
+        if ($task->assign_to !== null) {
+            return ['status' => false, 'msg' => 'This task is already assigned to a user', 'code' => 400];
+        }
+
+        $user = User::find($data['assign_to']);
+        if (!$user) {
+            return ['status' => false, 'msg' => 'User not found!', 'code' => 404];
+        }
+
+        // assign task to normal user (not allow assign to user as admin or manager role)
+        if ($user->role !== null) {
+            return ['status' => false, 'msg' => "Can't assign task to this user", 'code' => 400];
+        }
+
+        try {
+            // date with timezone
+            $dueDate = Carbon::createFromFormat('d-m-Y H:i', $data['due_date']);
+
+            // check if date is oldest not future
+            if ($dueDate->isPast()) {
+                return ['status' => false, 'msg' => 'Due date must be a future date.', 'code' => 400];
+            }
+        } catch (InvalidFormatException $e) {
+            return ['status' => false, 'msg' => 'Invalid due date format, please use d-m-Y H:i', 'code' => 400];
+        }
+
+        $task->assign_to = $data['assign_to'];
+
+        // date without timezone
+        $task->due_date = $dueDate->toDateTime()->format('d-m-Y H:i');
+        $task->status = 'in-progress';
+        $task->save();
 
         return ['status' => true];
     }
@@ -161,54 +188,19 @@ class TaskService
     public function delivery(Task $task)
     {
         if (Auth::user()->role !== null || $task->status !== 'in-progress') {
+            Log::info($task->status);
+            Log::info(Auth::user()->role);
             return ['status'    =>  false,  'msg' => 'User unAuthorization or task status not in-progress', 'code'  =>   400];
         }
+
+        // check if task assigned to auth user
         if ($task->assign_to !== Auth::id()) {
             return ['status'    =>  false,  'msg' => 'This task assigned to another user', 'code'  =>   400];
         }
+
         $task->status = 'done';
         $task->due_date = now()->toDateTime()->format('d-m-Y H:i');
         $task->save();
         return ['status'    =>  true];
-    }
-
-    /**
-     * Assigned a specified task to user
-     * @param array $data
-     * @param \App\Models\Task $task
-     * @return array
-     */
-    public function assign(array $data, Task $task)
-    {
-        if ($task->assign_to !== null) {
-            return ['status' => false, 'msg' => 'This task is already assigned to a user', 'code' => 400];
-        }
-
-        $user = User::find($data['assign_to']);
-        if (!$user) {
-            return ['status' => false, 'msg' => 'User not found!', 'code' => 404];
-        }
-
-        if ($user->role !== null) {
-            return ['status' => false, 'msg' => "Can't assign task to this user", 'code' => 400];
-        }
-
-        try {
-            // date with timezone
-            $dueDate = Carbon::createFromFormat('d-m-Y H:i', $data['due_date']);
-            if ($dueDate->isPast()) {
-                return ['status' => false, 'msg' => 'Due date must be a future date.', 'code' => 400];
-            }
-        } catch (\InvalidArgumentException $e) {
-            return ['status' => false, 'msg' => 'Invalid due date format, please use d-m-Y H:i', 'code' => 400];
-        }
-
-        $task->assign_to = $data['assign_to'];
-        // date without timezone
-        $task->due_date = $dueDate->toDateTime()->format('d-m-Y H:i');
-        $task->status = 'in-progress';
-        $task->save();
-
-        return ['status' => true];
     }
 }

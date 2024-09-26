@@ -30,6 +30,7 @@ The **Task Management API** is a RESTful web service built with PHP and MySQL th
 -   Retrieve details of all users by just admin
 -   Retrieve details of a specific user by owned account
 -   Login for user, admin and manager
+-   Refresh token 
 -   Logout for user, admin and manager
 -   Update user profile by just admin
 -   Delete user account by owned account

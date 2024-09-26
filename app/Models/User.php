@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -20,7 +19,6 @@ class User extends Authenticatable implements JWTSubject
 
     /**
      * The attributes that are mass assignable.
-     *
      * @var array<int, string>
      */
     protected $fillable = [
@@ -39,7 +37,6 @@ class User extends Authenticatable implements JWTSubject
 
     /**
      * The attributes that should be hidden for serialization.
-     *
      * @var array<int, string>
      */
     protected $hidden = [
@@ -49,7 +46,6 @@ class User extends Authenticatable implements JWTSubject
 
     /**
      * The attributes that should be cast.
-     *
      * @var array<string, string>
      */
     protected $casts = [
@@ -58,7 +54,6 @@ class User extends Authenticatable implements JWTSubject
 
     /**
      * Get the identifier that will be stored in the JWT claim.
-     *
      * @return mixed
      */
     public function getJWTIdentifier()
@@ -68,7 +63,6 @@ class User extends Authenticatable implements JWTSubject
 
     /**
      * Return a key-value array, containing any custom claims to be added to the JWT.
-     *
      * @return array
      */
     public function getJWTCustomClaims()
@@ -78,11 +72,25 @@ class User extends Authenticatable implements JWTSubject
 
     /**
      * Get all tasks assigned to the user.
-     *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function task(): HasMany
     {
         return $this->hasMany(Task::class, 'assign_to');
+    }
+
+    /**
+     * Get normal users (Not admin and manager ) with 'in-progress' tasks
+     * @return \Illuminate\Database\Eloquent\Builder[]|\Illuminate\Database\Eloquent\Collection
+     */
+    public static function getUsersWithTasksProgress()
+    {
+        return self::with(['task' => function ($query) {
+            // get just tasks that status is in-progress
+            $query->where('status', 'in-progress')->get();
+        }])->where(function ($query) {
+            $query->where('email', 'not like', '%admin%')
+                ->where('email', 'not like', '%manager%');
+        })->get();
     }
 }

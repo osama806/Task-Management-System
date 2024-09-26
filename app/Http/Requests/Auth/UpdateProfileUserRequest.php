@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
 
-class UpdateProfileFormRequest extends FormRequest
+class UpdateProfileUserRequest extends FormRequest
 {
     use ResponseTrait;
 
@@ -38,8 +38,8 @@ class UpdateProfileFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'      => 'nullable|min:3|max:50',
-            'password'  => 'nullable|confirmed|min:8',
+            'name'      => 'nullable|string|min:3|max:50',
+            'password'  => 'nullable|string|confirmed|min:8|max:15',
         ];
     }
 
@@ -61,8 +61,8 @@ class UpdateProfileFormRequest extends FormRequest
     public function attributes()
     {
         return [
-            "name"      =>      "full name",
-            "password"  =>      "password",
+            "name"      =>      "Full name",
+            "password"  =>      "Password",
         ];
     }
 
@@ -75,8 +75,9 @@ class UpdateProfileFormRequest extends FormRequest
     {
         return [
             'required'         =>      ':attribute is required',
-            'min'              =>      ':attribute must be at least 8 characters long.',
-            'confirmed'        =>      ':attribute do not match.'
+            'confirmed'        =>      ':attribute do not match.',
+            'min'              =>      ':attribute must be at least :min characters long.',
+            'max'              =>      'The :attribute must not exceed :max characters.',
         ];
     }
 }

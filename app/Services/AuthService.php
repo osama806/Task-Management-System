@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Traits\ResponseTrait;
 use Exception;
@@ -21,36 +22,16 @@ class AuthService
      */
     public function index()
     {
+        // just admin can show all users with their tasks
         if (Auth::user()->role !== 'admin') {
             return ['status' => false, 'msg' => "Can't access to this permission", 'code' => 400];
         }
 
-        $users = User::with('task')->get();
-        $data = [];
+        // Call the static method to get users with 'in-progress' tasks
+        $users = User::getUsersWithTasksProgress();
 
-        foreach ($users as $user) {
-            $tasks = [];
-
-            if ($user->task->count() > 0) {
-                foreach ($user->task as $t) {
-                    $tasks[] = [
-                        'title'       => $t->title,
-                        'description' => $t->description,
-                        'priority'    => $t->priority,
-                        'status'      => $t->status,
-                        'due_date'    => $t->due_date
-                    ];
-                }
-            }
-
-            $data[] = [
-                'name'  => $user->name,
-                'email' => $user->email,
-                'tasks' => $tasks
-            ];
-        }
-
-        return ['status' => true, 'users' => $data];
+        // get users through resource best of foreach loop
+        return ['status' => true, 'users' => UserResource::collection($users)];
     }
 
     /**
@@ -62,6 +43,8 @@ class AuthService
     {
         try {
             $role = null;
+
+            // check if email request contains @admin OR @manager
             if (strpos($data['email'], '@admin') !== false) {
                 $role = 'admin';
             } elseif (strpos($data['email'], '@manager') !== false) {
@@ -103,48 +86,19 @@ class AuthService
     }
 
     /**
-     * Refresh token method
-     * @return array
-     */
-    public function refreshToken()
-    {
-        try {
-            $newToken = JWTAuth::parseToken()->refresh();
-
-            return [
-                'status' => true,
-                'token'  => $newToken,
-            ];
-        } catch (TokenInvalidException $e) {
-            return [
-                'status' => false,
-                'msg'    => 'Token is invalid',
-                'code'   => 401
-            ];
-        } catch (JWTException $e) {
-            return [
-                'status' => false,
-                'msg'    => 'A token is required',
-                'code'   => 400
-            ];
-        }
-    }
-
-    /**
      * Get user profile data
      * @return array
      */
     public function show()
     {
         $user = Auth::user();
-        if ($user->role !== null) {
-            $data = [
+        $data = $user->role !== null
+            ? [
                 "name"          =>      $user->name,
                 "email"         =>      $user->email,
                 "role"          =>      $user->role
-            ];
-        } else
-            $data = [
+            ]
+            : [
                 "name"          =>      $user->name,
                 "email"         =>      $user->email,
             ];

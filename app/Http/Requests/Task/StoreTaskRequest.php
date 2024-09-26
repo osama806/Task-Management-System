@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
 
-class UpdateFormRequest extends FormRequest
+class StoreTaskRequest extends FormRequest
 {
     use ResponseTrait;
     /**
@@ -15,7 +15,7 @@ class UpdateFormRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return Auth::check() && Auth::user()->role === "admin";
+        return Auth::check() && Auth::user()->role !== null;
     }
 
     /**
@@ -36,11 +36,9 @@ class UpdateFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'             =>      'nullable|string|max:100',
-            'description'       =>      'nullable|string',
-            'priority'          =>      'nullable|numeric|min:1|max:10',
-            'assign_to'         =>      'nullable|numeric|min:1',
-            'due_date'          =>      'nullable|date|date_format:d-m-Y H:i'
+            'title'             =>      'required|string|min:2|max:100|unique:user_tasks,title',
+            'description'       =>      'required|string|max:256',
+            'priority'          =>      'required|numeric|min:1|max:10',
         ];
     }
 
@@ -65,8 +63,6 @@ class UpdateFormRequest extends FormRequest
             'title'        => 'Task title',
             'description'  => 'Task description',
             'priority'     => 'Task priority',
-            'assign_to'    => 'Assignee',
-            'due_date'     => 'Due date',
         ];
     }
 
@@ -78,10 +74,10 @@ class UpdateFormRequest extends FormRequest
     {
         return [
             'required'       => 'The :attribute field is required.',
+            'unique'         => 'This :attribute is already taken',
             'numeric'        => 'The :attribute must be a number.',
-            'min'            => 'The :attribute field must be at least 1.',
-            'max'            => 'The :attribute field must not be greater than 10.',
-            'date'           => 'Please provide a valid date for the :attribute.',
+            'min'            => 'The :attribute field must be at least :min.',
+            'max'            => 'The :attribute field must not be greater than :max.',
         ];
     }
 }

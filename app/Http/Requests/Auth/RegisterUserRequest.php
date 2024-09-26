@@ -1,13 +1,12 @@
 <?php
 
-namespace App\Http\Requests\Task;
+namespace App\Http\Requests\Auth;
 
-use App\Traits\ResponseTrait;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Support\Facades\Auth;
+use App\Traits\ResponseTrait;
 
-class StoreFormRequest extends FormRequest
+class RegisterUserRequest extends FormRequest
 {
     use ResponseTrait;
     /**
@@ -15,17 +14,7 @@ class StoreFormRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return Auth::check() && Auth::user()->role !== null;
-    }
-
-    /**
-     * Get errors that show from authorize
-     * @throws \Illuminate\Http\Exceptions\HttpResponseException
-     * @return never
-     */
-    public function failedAuthorization()
-    {
-        throw new HttpResponseException($this->getResponse('error', 'This action is unauthorized.', 401));
+        return true;
     }
 
     /**
@@ -36,9 +25,10 @@ class StoreFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'             =>      'required|string|min:2|max:100',
-            'description'       =>      'required|string',
-            'priority'          =>      'required|numeric|min:1|max:10',
+            'name'      =>      'required|string|max:100',
+            'email'     =>      'required|string|email|unique:users,email',
+            'password'  =>      'required|string|confirmed|min:8|max:15',
+            'role'      =>      'nullable|string|in:admin,manager'
         ];
     }
 
@@ -60,9 +50,10 @@ class StoreFormRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'title'        => 'Task title',
-            'description'  => 'Task description',
-            'priority'     => 'Task priority',
+            'name'     => 'Full Name',
+            'email'    => 'Email Address',
+            'password' => 'Password',
+            'role'     => 'User Role',
         ];
     }
 
@@ -73,10 +64,14 @@ class StoreFormRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'required'       => 'The :attribute field is required.',
-            'numeric'        => 'The :attribute must be a number.',
-            'min'            => 'The :attribute field must be at least :min.',
-            'max'            => 'The :attribute field must not be greater than :max.',
+            'required'      => 'The :attribute is required.',
+            'string'        => 'The :attribute must be a valid string.',
+            'max'           => 'The :attribute must not exceed :max characters.',
+            'email'         => 'Please provide a valid :attribute.',
+            'unique'        => 'This :attribute is already taken',
+            'confirmed'     => ':attribute confirmation does not match.',
+            'min'           => 'The :attribute must be at least :min characters long.',
+            'in'            => ':attribute must be either admin or manager.',
         ];
     }
 }

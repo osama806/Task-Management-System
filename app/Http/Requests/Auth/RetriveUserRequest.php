@@ -3,20 +3,30 @@
 namespace App\Http\Requests\Auth;
 
 use App\Traits\ResponseTrait;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
-class LoginFormRequest extends FormRequest
+class RetriveUserRequest extends FormRequest
 {
     use ResponseTrait;
-
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return true;
+        return Auth::check() && Auth::user()->role == "admin";
+    }
+
+    /**
+     * Handle failed authorization.
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException
+     * @return never
+     */
+    public function failedAuthorization()
+    {
+        throw new HttpResponseException($this->getResponse('error', 'This action is unauthorized.', 401));
     }
 
     /**
@@ -27,20 +37,19 @@ class LoginFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            "email"         =>      "required|email",
-            "password"      =>      "required|min:8"
+            'email'     =>  'required|string|email'
         ];
     }
 
     /**
-     * Get message that errors explanation
+     * Handle failed validation.
      * @param \Illuminate\Contracts\Validation\Validator $validator
      * @throws \Illuminate\Validation\ValidationException
      * @return never
      */
-    public function failedValidation(Validator $validator)
+    public function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
     {
-        throw new HttpResponseException( $this->getResponse("errors", $validator->errors(), 422));
+        throw new ValidationException($validator, $this->getResponse('errors', $validator->errors(), 422));
     }
 
     /**
@@ -50,8 +59,7 @@ class LoginFormRequest extends FormRequest
     public function attributes()
     {
         return [
-            "email"     =>      "email address",
-            "password"  =>      "password"
+            'email'    => 'Email Address',
         ];
     }
 
@@ -62,9 +70,8 @@ class LoginFormRequest extends FormRequest
     public function messages()
     {
         return [
-            "required"        =>      ":attribute is required",
-            "email"           =>      "Please enter a valid :attribute",
-            "min"             =>      ":attribute must be at least 8 characters long"
+            'required'      => 'The :attribute is required.',
+            'email'         => 'Please provide a valid :attribute.',
         ];
     }
 }

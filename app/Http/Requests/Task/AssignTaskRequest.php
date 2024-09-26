@@ -1,20 +1,32 @@
 <?php
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests\Task;
 
+use App\Traits\ResponseTrait;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use App\Traits\ResponseTrait;
+use Illuminate\Support\Facades\Auth;
 
-class RegisterFormRequest extends FormRequest
+class AssignTaskRequest extends FormRequest
 {
     use ResponseTrait;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return true;
+        return Auth::check() && Auth::user()->role !== null;
+    }
+
+    /**
+     * Handle failed authorization.
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException
+     * @return never
+     */
+    public function failedAuthorization()
+    {
+        throw new HttpResponseException($this->getResponse('error', 'This action is unauthorized.', 401));
     }
 
     /**
@@ -25,15 +37,13 @@ class RegisterFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'      =>      'required|string|max:100',
-            'email'     =>      'required|email',
-            'password'  =>      'required|confirmed|min:6',
-            'role'      =>      'nullable|in:admin,manager'
+            'assign_to' => 'required|numeric|min:1|exists:users,id',
+            'due_date'  => 'required|date|date_format:d-m-Y H:i'
         ];
     }
 
     /**
-     * Get message that errors explanation
+     * Handle failed validation.
      * @param \Illuminate\Contracts\Validation\Validator $validator
      * @throws \Illuminate\Http\Exceptions\HttpResponseException
      * @return never
@@ -50,10 +60,8 @@ class RegisterFormRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'name'     => 'Full Name',
-            'email'    => 'Email Address',
-            'password' => 'Password',
-            'role'     => 'User Role',
+            'assign_to' => 'Assignee',
+            'due_date'  => 'Due date',
         ];
     }
 
@@ -64,13 +72,12 @@ class RegisterFormRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'required'      => 'The :attribute is required.',
-            'string'        => 'The :attribute must be a valid string.',
-            'max'           => 'The :attribute must not exceed 100 characters.',
-            'email'         => 'Please provide a valid :attribute.',
-            'confirmed'     => ':attribute confirmation does not match.',
-            'min'           => 'The :attribute must be at least 6 characters long.',
-            'in'            => 'The selected :attribute must be either admin or manager.',
+            'required'    => 'The :attribute field is required.',
+            'numeric'     => 'The :attribute must be a number.',
+            'min'         => 'The :attribute field must be at least :min.',
+            'exists'      => 'The selected user does not exist',
+            'date'        => 'Please provide a valid date for the :attribute.',
+            'date_format' => 'Please provide a valid date format for the :attribute. Expected format: d-m-Y H:i.',
         ];
     }
 }

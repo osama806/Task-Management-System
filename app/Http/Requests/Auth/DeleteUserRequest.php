@@ -1,22 +1,22 @@
 <?php
 
-namespace App\Http\Requests\Task;
+namespace App\Http\Requests\Auth;
 
 use App\Traits\ResponseTrait;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
-class AssignFormRequest extends FormRequest
+class DeleteUserRequest extends FormRequest
 {
     use ResponseTrait;
-
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return Auth::check() && Auth::user()->role !== null;
+        return Auth::check() && Auth::user()->role === 'admin';
     }
 
     /**
@@ -37,45 +37,41 @@ class AssignFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'assign_to' => 'required|numeric|min:1',
-            'due_date'  => 'required|date_format:d-m-Y H:i'
+            'email'     =>      'required|string|email'
         ];
     }
 
     /**
      * Handle failed validation.
      * @param \Illuminate\Contracts\Validation\Validator $validator
-     * @throws \Illuminate\Http\Exceptions\HttpResponseException
+     * @throws \Illuminate\Validation\ValidationException
      * @return never
      */
     public function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
     {
-        throw new HttpResponseException($this->getResponse('errors', $validator->errors(), 422));
+        throw new ValidationException($validator, $this->getResponse('errors', $validator->errors(), 422));
     }
 
     /**
      * Get custom attributes for validator errors.
-     * @return array
+     * @return string[]
      */
-    public function attributes(): array
+    public function attributes()
     {
         return [
-            'assign_to' => 'Assignee',
-            'due_date'  => 'Due date',
+            'email'    => 'Email Address',
         ];
     }
 
     /**
      * Get custom messages for validator errors.
-     * @return array
+     * @return string[]
      */
-    public function messages(): array
+    public function messages()
     {
         return [
-            'required'    => 'The :attribute field is required.',
-            'numeric'     => 'The :attribute must be a number.',
-            'min'         => 'The :attribute field must be at least 1.',
-            'date_format' => 'Please provide a valid date format for the :attribute. Expected format: d-m-Y H:i.',
+            'required'      => 'The :attribute is required.',
+            'email'         => 'Please provide a valid :attribute.',
         ];
     }
 }

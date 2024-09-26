@@ -6,7 +6,7 @@ use App\Traits\ResponseTrait;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
-class FilterFormRequest extends FormRequest
+class FilterTaskRequest extends FormRequest
 {
     use ResponseTrait;
     /**
@@ -25,7 +25,7 @@ class FilterFormRequest extends FormRequest
     public function rules(): array
     {
         return [
-            "priority"      =>      'nullable|numeric|min:1',
+            "priority"      =>      'nullable|numeric|min:1|max:10',
             "status"        =>      'nullable|string|in:pending,in-progress,done'
         ];
     }
@@ -63,7 +63,8 @@ class FilterFormRequest extends FormRequest
             "numeric" => 'The :attribute must be a number.',
             "string"  => 'The :attribute must be a string.',
             "in"      => 'The selected :attribute is invalid.',
-            "min"     => 'The :attribute field must be at least :min.'
+            "min"     => 'The :attribute field must be at least :min.',
+            'max'     => 'The :attribute must not exceed :max characters.',
         ];
     }
 }
