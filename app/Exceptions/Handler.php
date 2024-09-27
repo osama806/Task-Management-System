@@ -2,11 +2,14 @@
 
 namespace App\Exceptions;
 
+use App\Traits\ResponseTrait;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 
 class Handler extends ExceptionHandler
 {
+    use ResponseTrait;
     /**
      * A list of exception types with their corresponding custom log levels.
      *
@@ -44,5 +47,24 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    /**
+     * 
+     * @param mixed $request
+     * @param \Throwable $exception
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response|\Symfony\Component\HttpFoundation\Response
+     */
+    public function render($request, Throwable $exception)
+    {
+        if ($exception instanceof ModelNotFoundException) {
+            return $this->getResponse(
+                'error',
+                'Resource not found',
+                404
+            );
+        }
+
+        return parent::render($request, $exception);
     }
 }

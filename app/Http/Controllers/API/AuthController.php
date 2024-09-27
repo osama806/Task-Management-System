@@ -101,10 +101,8 @@ class AuthController extends Controller
      */
     public function show()
     {
-        $response = $this->authService->show();
-        return $response['status']
-            ? $this->getResponse("profile", $response['profile'], 200)
-            : $this->getResponse("msg", "There is error in server", 500);
+        $user = Auth::user();
+        return $this->getResponse("profile", new UserResource($user), 200);
     }
 
     /**

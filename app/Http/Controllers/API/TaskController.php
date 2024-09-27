@@ -67,14 +67,9 @@ class TaskController extends Controller
      * @param \App\Models\Task $task
      * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Task $task)
     {
-        try {
-            $task = Task::findOrFail($id);
-            return $this->getResponse('task', new TaskResource($task), 200);
-        } catch (ModelNotFoundException $e) {
-            return $this->getResponse('error', 'Task not found', 404);
-        }
+        return $this->getResponse('task', new TaskResource($task), 200);
     }
 
     /**

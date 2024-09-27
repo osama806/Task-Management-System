@@ -86,26 +86,6 @@ class AuthService
     }
 
     /**
-     * Get user profile data
-     * @return array
-     */
-    public function show()
-    {
-        $user = Auth::user();
-        $data = $user->role !== null
-            ? [
-                "name"          =>      $user->name,
-                "email"         =>      $user->email,
-                "role"          =>      $user->role
-            ]
-            : [
-                "name"          =>      $user->name,
-                "email"         =>      $user->email,
-            ];
-        return ['status'    =>      true, 'profile'     =>      $data];
-    }
-
-    /**
      * Update user profile in storage
      * @param array $data
      * @param \App\Models\User $user
